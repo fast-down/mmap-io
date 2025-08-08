@@ -20,4 +20,3 @@ pub enum FlushPolicy {
     /// Reserved for future time-based flushing (no-op for now).
     EveryMillis(u64),
 }
-

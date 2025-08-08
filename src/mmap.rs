@@ -157,9 +157,9 @@ impl MemoryMappedFile {
             return Err(MmapIoError::ResizeFailed(ERR_ZERO_SIZE.into()));
         }
         if size > MAX_MMAP_SIZE {
-            return Err(MmapIoError::ResizeFailed(
-                format!("Size {size} exceeds maximum safe limit of {MAX_MMAP_SIZE} bytes")
-            ));
+            return Err(MmapIoError::ResizeFailed(format!(
+                "Size {size} exceeds maximum safe limit of {MAX_MMAP_SIZE} bytes"
+            )));
         }
         let path_ref = path.as_ref();
         let file = OpenOptions::new()
@@ -184,7 +184,9 @@ impl MemoryMappedFile {
             #[cfg(feature = "hugepages")]
             huge_pages: false,
         };
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 
     /// Open an existing file and memory-map it read-only.
@@ -209,7 +211,9 @@ impl MemoryMappedFile {
             #[cfg(feature = "hugepages")]
             huge_pages: false,
         };
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 
     /// Open an existing file and memory-map it read-write.
@@ -240,7 +244,9 @@ impl MemoryMappedFile {
             #[cfg(feature = "hugepages")]
             huge_pages: false,
         };
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 
     /// Return current mapping mode.
@@ -300,7 +306,9 @@ impl MemoryMappedFile {
     pub fn as_slice_mut(&self, offset: u64, len: u64) -> Result<MappedSliceMut<'_>> {
         let (start, end) = slice_range(offset, len, self.current_len()?)?;
         match &self.inner.map {
-            MapVariant::Ro(_) => Err(MmapIoError::InvalidMode("mutable access on read-only mapping")),
+            MapVariant::Ro(_) => Err(MmapIoError::InvalidMode(
+                "mutable access on read-only mapping",
+            )),
             MapVariant::Rw(lock) => {
                 let guard = lock.write();
                 Ok(MappedSliceMut {
@@ -311,7 +319,9 @@ impl MemoryMappedFile {
             MapVariant::Cow(_) => {
                 // Phase-1: COW is read-only for safety. Writable COW will be added with a persistent
                 // private RW view in a follow-up change.
-                Err(MmapIoError::InvalidMode("mutable access on copy-on-write mapping (phase-1 read-only)"))
+                Err(MmapIoError::InvalidMode(
+                    "mutable access on copy-on-write mapping (phase-1 read-only)",
+                ))
             }
         }
     }
@@ -334,12 +344,16 @@ impl MemoryMappedFile {
             return Ok(());
         }
         if self.inner.mode != MmapMode::ReadWrite {
-            return Err(MmapIoError::InvalidMode("Update region requires ReadWrite mode."));
+            return Err(MmapIoError::InvalidMode(
+                "Update region requires ReadWrite mode.",
+            ));
         }
         let len = data.len() as u64;
         let (start, end) = slice_range(offset, len, self.current_len()?)?;
         match &self.inner.map {
-            MapVariant::Ro(_) => Err(MmapIoError::InvalidMode("Cannot write to read-only mapping")),
+            MapVariant::Ro(_) => Err(MmapIoError::InvalidMode(
+                "Cannot write to read-only mapping",
+            )),
             MapVariant::Rw(lock) => {
                 {
                     let mut guard = lock.write();
@@ -349,7 +363,9 @@ impl MemoryMappedFile {
                 self.apply_flush_policy(len)?;
                 Ok(())
             }
-            MapVariant::Cow(_) => Err(MmapIoError::InvalidMode("Cannot write to copy-on-write mapping (phase-1 read-only)")),
+            MapVariant::Cow(_) => Err(MmapIoError::InvalidMode(
+                "Cannot write to copy-on-write mapping (phase-1 read-only)",
+            )),
         }
     }
 
@@ -410,7 +426,9 @@ impl MemoryMappedFile {
 
                 // Fallback/full flush using memmap2 API
                 let guard = lock.read();
-                guard.flush().map_err(|e| MmapIoError::FlushFailed(e.to_string()))?;
+                guard
+                    .flush()
+                    .map_err(|e| MmapIoError::FlushFailed(e.to_string()))?;
                 // Reset accumulator after a successful flush
                 *self.inner.written_since_last_flush.write() = 0;
                 Ok(())
@@ -424,14 +442,18 @@ impl MemoryMappedFile {
     pub async fn flush_async(&self) -> Result<()> {
         // Use spawn_blocking to avoid blocking the async scheduler
         let this = self.clone();
-        tokio::task::spawn_blocking(move || this.flush()).await.map_err(|e| MmapIoError::FlushFailed(format!("join error: {e}")))?
+        tokio::task::spawn_blocking(move || this.flush())
+            .await
+            .map_err(|e| MmapIoError::FlushFailed(format!("join error: {e}")))?
     }
 
     /// Async flush a specific byte range to disk.
     #[cfg(feature = "async")]
     pub async fn flush_range_async(&self, offset: u64, len: u64) -> Result<()> {
         let this = self.clone();
-        tokio::task::spawn_blocking(move || this.flush_range(offset, len)).await.map_err(|e| MmapIoError::FlushFailed(format!("join error: {e}")))?
+        tokio::task::spawn_blocking(move || this.flush_range(offset, len))
+            .await
+            .map_err(|e| MmapIoError::FlushFailed(format!("join error: {e}")))?
     }
 
     /// Flush a specific byte range to disk.
@@ -510,12 +532,14 @@ impl MemoryMappedFile {
             return Err(MmapIoError::InvalidMode("Resize requires ReadWrite mode"));
         }
         if new_size == 0 {
-            return Err(MmapIoError::ResizeFailed("New size must be greater than zero".into()));
+            return Err(MmapIoError::ResizeFailed(
+                "New size must be greater than zero".into(),
+            ));
         }
         if new_size > MAX_MMAP_SIZE {
-            return Err(MmapIoError::ResizeFailed(
-                format!("New size {new_size} exceeds maximum safe limit of {MAX_MMAP_SIZE} bytes")
-            ));
+            return Err(MmapIoError::ResizeFailed(format!(
+                "New size {new_size} exceeds maximum safe limit of {MAX_MMAP_SIZE} bytes"
+            )));
         }
 
         let current = self.current_len()?;
@@ -550,8 +574,12 @@ impl MemoryMappedFile {
         // Remap with the new size.
         let new_map = unsafe { MmapMut::map_mut(&self.inner.file)? };
         match &self.inner.map {
-            MapVariant::Ro(_) => Err(MmapIoError::InvalidMode("Cannot remap read-only mapping as read-write")),
-            MapVariant::Cow(_) => Err(MmapIoError::InvalidMode("resize not supported on copy-on-write mapping")),
+            MapVariant::Ro(_) => Err(MmapIoError::InvalidMode(
+                "Cannot remap read-only mapping as read-write",
+            )),
+            MapVariant::Cow(_) => Err(MmapIoError::InvalidMode(
+                "resize not supported on copy-on-write mapping",
+            )),
             MapVariant::Rw(lock) => {
                 let mut guard = lock.write();
                 *guard = new_map;
@@ -574,19 +602,19 @@ impl MemoryMappedFile {
     #[cfg(all(unix, target_os = "linux"))]
     fn try_linux_async_flush(&self, len: usize) -> Result<bool> {
         use std::os::fd::AsRawFd;
-        
+
         // Get the file descriptor (unused but kept for potential future use)
         let _fd = self.inner.file.as_raw_fd();
-        
+
         // Try to get the mapping pointer for msync
         match &self.inner.map {
             MapVariant::Rw(lock) => {
                 let guard = lock.read();
                 let ptr = guard.as_ptr() as *mut libc::c_void;
-                
+
                 // SAFETY: msync requires a valid mapping address/len; memmap2 handles mapping
                 let ret = unsafe { libc::msync(ptr, len, libc::MS_ASYNC) };
-                
+
                 if ret == 0 {
                     // MS_ASYNC succeeded, reset accumulator
                     *self.inner.written_since_last_flush.write() = 0;
@@ -619,18 +647,18 @@ fn map_mut_with_options(file: &File, len: u64, huge: bool) -> Result<MmapMut> {
     {
         // Create the standard mapping first
         let mmap = unsafe { MmapMut::map_mut(file) }.map_err(|e| MmapIoError::Io(e.into()))?;
-        
+
         if huge {
             // Request Transparent Huge Pages (THP) for this mapping
             // This is a hint to the kernel - not a guarantee
             unsafe {
                 let mmap_ptr = mmap.as_ptr() as *mut libc::c_void;
-                
+
                 // MADV_HUGEPAGE: Enable THP for this memory region
                 // The kernel will attempt to use huge pages when beneficial
                 // This is the most compatible approach with memmap2's constraints
                 let ret = libc::madvise(mmap_ptr, len as usize, libc::MADV_HUGEPAGE);
-                
+
                 if ret != 0 {
                     // madvise failed - huge pages may not be available
                     // This is not fatal - the mapping is still valid with regular pages
@@ -639,7 +667,7 @@ fn map_mut_with_options(file: &File, len: u64, huge: bool) -> Result<MmapMut> {
                 }
             }
         }
-        
+
         Ok(mmap)
     }
     #[cfg(not(all(unix, target_os = "linux")))]
@@ -691,7 +719,9 @@ impl MemoryMappedFile {
             #[cfg(feature = "hugepages")]
             huge_pages: false,
         };
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 }
 
@@ -828,15 +858,17 @@ impl MemoryMappedFileBuilder {
         match mode {
             MmapMode::ReadWrite => {
                 let size = self.size.ok_or_else(|| {
-                    MmapIoError::ResizeFailed("Size must be set for create() in ReadWrite mode".into())
+                    MmapIoError::ResizeFailed(
+                        "Size must be set for create() in ReadWrite mode".into(),
+                    )
                 })?;
                 if size == 0 {
                     return Err(MmapIoError::ResizeFailed(ERR_ZERO_SIZE.into()));
                 }
                 if size > MAX_MMAP_SIZE {
-                    return Err(MmapIoError::ResizeFailed(
-                        format!("Size {size} exceeds maximum safe limit of {MAX_MMAP_SIZE} bytes")
-                    ));
+                    return Err(MmapIoError::ResizeFailed(format!(
+                        "Size {size} exceeds maximum safe limit of {MAX_MMAP_SIZE} bytes"
+                    )));
                 }
                 let path_ref = &self.path;
                 let file = OpenOptions::new()
@@ -862,7 +894,9 @@ impl MemoryMappedFileBuilder {
                     #[cfg(feature = "hugepages")]
                     huge_pages: self.huge_pages,
                 };
-                Ok(MemoryMappedFile { inner: Arc::new(inner) })
+                Ok(MemoryMappedFile {
+                    inner: Arc::new(inner),
+                })
             }
             MmapMode::ReadOnly => {
                 let path_ref = &self.path;
@@ -880,7 +914,9 @@ impl MemoryMappedFileBuilder {
                     #[cfg(feature = "hugepages")]
                     huge_pages: false,
                 };
-                Ok(MemoryMappedFile { inner: Arc::new(inner) })
+                Ok(MemoryMappedFile {
+                    inner: Arc::new(inner),
+                })
             }
             MmapMode::CopyOnWrite => {
                 #[cfg(feature = "cow")]
@@ -907,11 +943,15 @@ impl MemoryMappedFileBuilder {
                         #[cfg(feature = "hugepages")]
                         huge_pages: false,
                     };
-                    Ok(MemoryMappedFile { inner: Arc::new(inner) })
+                    Ok(MemoryMappedFile {
+                        inner: Arc::new(inner),
+                    })
                 }
                 #[cfg(not(feature = "cow"))]
                 {
-                    Err(MmapIoError::InvalidMode("CopyOnWrite mode requires 'cow' feature"))
+                    Err(MmapIoError::InvalidMode(
+                        "CopyOnWrite mode requires 'cow' feature",
+                    ))
                 }
             }
         }
@@ -937,7 +977,9 @@ impl MemoryMappedFileBuilder {
                     #[cfg(feature = "hugepages")]
                     huge_pages: false,
                 };
-                Ok(MemoryMappedFile { inner: Arc::new(inner) })
+                Ok(MemoryMappedFile {
+                    inner: Arc::new(inner),
+                })
             }
             MmapMode::ReadWrite => {
                 let path_ref = &self.path;
@@ -961,7 +1003,9 @@ impl MemoryMappedFileBuilder {
                     #[cfg(feature = "hugepages")]
                     huge_pages: self.huge_pages,
                 };
-                Ok(MemoryMappedFile { inner: Arc::new(inner) })
+                Ok(MemoryMappedFile {
+                    inner: Arc::new(inner),
+                })
             }
             MmapMode::CopyOnWrite => {
                 #[cfg(feature = "cow")]
@@ -988,11 +1032,15 @@ impl MemoryMappedFileBuilder {
                         #[cfg(feature = "hugepages")]
                         huge_pages: false,
                     };
-                    Ok(MemoryMappedFile { inner: Arc::new(inner) })
+                    Ok(MemoryMappedFile {
+                        inner: Arc::new(inner),
+                    })
                 }
                 #[cfg(not(feature = "cow"))]
                 {
-                    Err(MmapIoError::InvalidMode("CopyOnWrite mode requires 'cow' feature"))
+                    Err(MmapIoError::InvalidMode(
+                        "CopyOnWrite mode requires 'cow' feature",
+                    ))
                 }
             }
         }

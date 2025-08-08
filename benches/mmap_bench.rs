@@ -55,41 +55,49 @@ fn bench_update_region_flush(b: &mut Criterion) {
         });
 
         // Variant B: updates with flush to measure sync overhead
-        group.bench_with_input(BenchmarkId::new("update_plus_flush", size), &size, |ben, &sz| {
-            let path = tmp_path(&format!("update_flush_{}", sz));
-            let _ = fs::remove_file(&path);
-            let mmap = MemoryMappedFile::create_rw(&path, sz as u64).expect("create_rw");
+        group.bench_with_input(
+            BenchmarkId::new("update_plus_flush", size),
+            &size,
+            |ben, &sz| {
+                let path = tmp_path(&format!("update_flush_{}", sz));
+                let _ = fs::remove_file(&path);
+                let mmap = MemoryMappedFile::create_rw(&path, sz as u64).expect("create_rw");
 
-            let payload = vec![0xAC_u8; sz];
-            ben.iter(|| {
-                mmap.update_region(0, &payload).expect("update");
-                mmap.flush().expect("flush");
-            });
+                let payload = vec![0xAC_u8; sz];
+                ben.iter(|| {
+                    mmap.update_region(0, &payload).expect("update");
+                    mmap.flush().expect("flush");
+                });
 
-            let _ = fs::remove_file(&path);
-        });
+                let _ = fs::remove_file(&path);
+            },
+        );
 
         // Variant C: threshold-based automatic flushing via builder
-        group.bench_with_input(BenchmarkId::new("update_threshold", size), &size, |ben, &sz| {
-            let path = tmp_path(&format!("update_threshold_{}", sz));
-            let _ = fs::remove_file(&path);
+        group.bench_with_input(
+            BenchmarkId::new("update_threshold", size),
+            &size,
+            |ben, &sz| {
+                let path = tmp_path(&format!("update_threshold_{}", sz));
+                let _ = fs::remove_file(&path);
 
-            // Use builder to set a byte-threshold flush policy equal to the write size
-            let mmap = mmap_io::MemoryMappedFile::builder(&path)
-                .mode(mmap_io::MmapMode::ReadWrite)
-                .size(sz as u64)
-                .flush_policy(FlushPolicy::EveryBytes(sz)) // flush roughly once per write
-                .create()
-                .expect("builder create_rw with threshold");
+                // Use builder to set a byte-threshold flush policy equal to the write size
+                let mmap = mmap_io::MemoryMappedFile::builder(&path)
+                    .mode(mmap_io::MmapMode::ReadWrite)
+                    .size(sz as u64)
+                    .flush_policy(FlushPolicy::EveryBytes(sz)) // flush roughly once per write
+                    .create()
+                    .expect("builder create_rw with threshold");
 
-            let payload = vec![0xAD_u8; sz];
-            ben.iter(|| {
-                mmap.update_region(0, &payload).expect("update");
-                criterion::black_box(&payload);
-            });
+                let payload = vec![0xAD_u8; sz];
+                ben.iter(|| {
+                    mmap.update_region(0, &payload).expect("update");
+                    criterion::black_box(&payload);
+                });
 
-            let _ = fs::remove_file(&path);
-        });
+                let _ = fs::remove_file(&path);
+            },
+        );
     }
     group.finish();
 }
