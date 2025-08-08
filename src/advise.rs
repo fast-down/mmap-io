@@ -84,8 +84,8 @@ impl MemoryMappedFile {
         {
             // Windows only supports prefetching (WillNeed equivalent)
             if matches!(advice, MmapAdvice::WillNeed) {
-                use std::mem;
-                use std::ptr;
+                
+                
 
                 #[allow(non_snake_case)]
                 #[repr(C)]
